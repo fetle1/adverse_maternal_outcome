@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import joblib
@@ -8,12 +7,12 @@ import os
 # --- Load Model Artifacts ---
 @st.cache_resource
 def load_maternal_model_artifacts():
-    model = joblib.load('model_artifacts_maternal/random_forest_model_maternal.joblib')
-    with open('model_artifacts_maternal/label_encoder_maternal.pkl', 'rb') as f:
+    model = joblib.load('Model_artifacts/random_forest_model_maternal.joblib')
+    with open('Model_artifacts/label_encoder_maternal.pkl', 'rb') as f:
         le = pickle.load(f)
-    with open('model_artifacts_maternal/feature_columns_maternal.pkl', 'rb') as f:
+    with open('Model_artifacts/feature_columns_maternal.pkl', 'rb') as f:
         feature_columns = pickle.load(f)
-    with open('model_artifacts_maternal/original_categorical_data_maternal.pkl', 'rb') as f:
+    with open('Model_artifacts/original_categorical_data_maternal.pkl', 'rb') as f:
         original_categorical_data = pickle.load(f)
     return model, le, feature_columns, original_categorical_data
 
