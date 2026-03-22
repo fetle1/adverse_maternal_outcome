@@ -9,7 +9,17 @@ st.set_page_config(
     page_icon="🤰",
     layout="wide"
 )
-
+# --- Custom Background Color ---
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #E6F2FF;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # --- Load Model Artifacts ---
 @st.cache_resource
 def load_maternal_model_artifacts():
