@@ -2,7 +2,13 @@ import streamlit as st
 import pandas as pd
 import joblib
 import pickle
-import os
+
+# --- Page Config ---
+st.set_page_config(
+    page_title="Maternal Outcome Predictor",
+    page_icon="🤰",
+    layout="wide"
+)
 
 # --- Load Model Artifacts ---
 @st.cache_resource
@@ -16,76 +22,84 @@ def load_maternal_model_artifacts():
         original_categorical_data = pickle.load(f)
     return model, le, feature_columns, original_categorical_data
 
-model_maternal, le_maternal, feature_columns_maternal, original_categorical_data_maternal = load_maternal_model_artifacts()
+model, le, feature_columns, original_categorical_data = load_maternal_model_artifacts()
 
-# --- Streamlit App Layout ---
-st.title('Maternal Adverse Outcome Prediction App')
-st.write('Enter the patient details to predict maternal adverse outcome.')
+# --- Title ---
+st.title("🤰 Maternal Adverse Outcome Prediction Tool")
+st.markdown("This tool estimates the risk of adverse maternal outcomes using antenatal care data.")
 
-# --- User Inputs ---
-st.sidebar.header('Patient Input Features')
+# --- Input Sections ---
+st.header("Patient Information")
 
-def user_input_features_maternal():
-    bmi = st.sidebar.slider('BMI', 15.0, 40.0, 25.0, step=0.1)
-    weight_first_ANC = st.sidebar.slider('Weight at first ANC (kg)', 40.0, 120.0, 65.0, step=0.5)
-    gdm_status = st.sidebar.selectbox('GDM Status', original_categorical_data_maternal['GDM_status'])
-    residence = st.sidebar.selectbox('Residence', original_categorical_data_maternal['Residence'])
-    muac = st.sidebar.slider('MUAC (cm)', 15.0, 40.0, 25.0, step=0.1)
-    number_children = st.sidebar.slider('Number of Children', 0, 10, 1)
-    education = st.sidebar.selectbox('Education', original_categorical_data_maternal['Education'])
-    history_abortion = st.sidebar.selectbox('History of Abortion', original_categorical_data_maternal['History_Abortion'])
+col1, col2 = st.columns(2)
 
-    data = {
-        'BMI': bmi,
-        'weight_first_ANC': weight_first_ANC,
-        'GDM_status': gdm_status,
-        'Residence': residence,
-        'MUAC': muac,
-        'Number_Children': number_children,
-        'Education': education,
-        'History_Abortion': history_abortion,
-    }
-    features = pd.DataFrame(data, index=[0])
-    return features
+with col1:
+    st.subheader("Demographic & Obstetric")
+    residence = st.selectbox("Residence", original_categorical_data['Residence'])
+    education = st.selectbox("Education Level", original_categorical_data['Education'])
+    number_children = st.slider("Number of Children", 0, 10, 1)
+    history_abortion = st.selectbox("History of Abortion", original_categorical_data['History_Abortion'])
 
-input_df_maternal = user_input_features_maternal()
+with col2:
+    st.subheader("Clinical & Nutritional")
+    bmi = st.slider("Body Mass Index (BMI)", 15.0, 40.0, 25.0, step=0.1)
+    weight_first_ANC = st.slider("Weight at First ANC Visit (kg)", 40.0, 120.0, 65.0, step=0.5)
+    muac = st.slider("MUAC (cm)", 15.0, 40.0, 25.0, step=0.1)
+    gdm_status = st.selectbox("Gestational Diabetes (GDM)", original_categorical_data['GDM_status'])
 
-st.subheader('User Input Features')
-st.write(input_df_maternal)
+# --- Create DataFrame ---
+input_df = pd.DataFrame({
+    'BMI': [bmi],
+    'weight_first_ANC': [weight_first_ANC],
+    'GDM_status': [gdm_status],
+    'Residence': [residence],
+    'MUAC': [muac],
+    'Number_Children': [number_children],
+    'Education': [education],
+    'History_Abortion': [history_abortion],
+})
 
-# --- Data Preprocessing for Prediction ---
-processed_input_maternal = pd.DataFrame(0, index=[0], columns=feature_columns_maternal)
+st.subheader("Input Summary")
+st.dataframe(input_df)
 
-# Fill numerical features
+# --- Preprocessing ---
+processed_input = pd.DataFrame(0, index=[0], columns=feature_columns)
+
+# Numerical
 for col in ['BMI', 'weight_first_ANC', 'MUAC', 'Number_Children']:
-    if col in processed_input_maternal.columns:
-        processed_input_maternal[col] = input_df_maternal[col].values[0]
+    if col in processed_input.columns:
+        processed_input[col] = input_df[col].values[0]
 
-# Handle categorical features using one-hot encoding
-for col in original_categorical_data_maternal.keys():
-    if col in input_df_maternal.columns:
-        val = input_df_maternal[col].values[0]
-        # Create dummy column name, e.g., 'Residence_Urban'
-        dummy_col = f"{col}_{val}"
-        if dummy_col in processed_input_maternal.columns:
-            processed_input_maternal[dummy_col] = 1
+# One-hot encoding
+for col in original_categorical_data.keys():
+    val = input_df[col].values[0]
+    dummy_col = f"{col}_{val}"
+    if dummy_col in processed_input.columns:
+        processed_input[dummy_col] = 1
 
-# Ensure the order of columns matches the training data
-processed_input_maternal = processed_input_maternal[feature_columns_maternal]
+processed_input = processed_input[feature_columns]
 
-# --- Prediction ---
-prediction_maternal = model_maternal.predict(processed_input_maternal)
-prediction_proba_maternal = model_maternal.predict_proba(processed_input_maternal)
+# --- Prediction Button ---
+if st.button("🔍 Predict Outcome"):
+    prediction = model.predict(processed_input)
+    prediction_proba = model.predict_proba(processed_input)
 
-st.subheader('Prediction')
-predicted_class_maternal = le_maternal.inverse_transform(prediction_maternal)[0]
-st.write(predicted_class_maternal)
+    predicted_class = le.inverse_transform(prediction)[0]
+    probability_df = pd.DataFrame(prediction_proba, columns=le.classes_)
 
-st.subheader('Prediction Probability')
-probability_df_maternal = pd.DataFrame(prediction_proba_maternal, columns=le_maternal.classes_)
-st.write(probability_df_maternal)
+    st.subheader("Prediction Result")
 
+    # Highlight result
+    if "adverse" in predicted_class.lower():
+        st.error(f"⚠️ High Risk: {predicted_class}")
+    else:
+        st.success(f"✅ Low Risk: {predicted_class}")
+
+    st.subheader("Prediction Probabilities")
+    st.dataframe(probability_df)
+
+# --- Footer ---
 st.markdown("""
 ---
-**Note:** This app predicts the likelihood of an adverse outcome based on the provided maternal inputs.
+**Disclaimer:** This tool is for research and decision-support purposes only and should not replace clinical judgment.
 """)
